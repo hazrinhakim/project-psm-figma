@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
+import { Lock, User as UserIcon } from 'lucide-react';
 import { User } from '../App';
-import { LogIn, Lock, User as UserIcon } from 'lucide-react';
-import { getUserByLoginId } from '../lib/database/users'; // Import fungsi Supabase
+import { supabase } from '../lib/supabase';
+import { getProfileById } from '../lib/database/profiles';
+import { Alert, AlertDescription } from './ui/alert';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import icamsLogo from '../styles/ICAMS-1.png';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
 export function Login({ onLogin }: LoginProps) {
-  const [loginId, setLoginId] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -18,20 +25,29 @@ export function Login({ onLogin }: LoginProps) {
     setError('');
 
     try {
-      // Panggil Supabase untuk dapatkan user berdasarkan loginId
-      const user = await getUserByLoginId(loginId);
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-      if (!user) {
-        setError('User not found.');
+      if (authError) {
+        setError(authError.message);
         return;
       }
 
-      // Validate password (⚠️ production kena guna hash)
-      if (user.password === password) {
-        onLogin(user);
-      } else {
-        setError('Invalid login credentials. Please try again.');
+      const sessionUser = data.user;
+      if (!sessionUser) {
+        setError('Login failed. Please try again.');
+        return;
       }
+
+      const profile = await getProfileById(sessionUser.id);
+      onLogin({
+        id: sessionUser.id,
+        fullName: profile?.fullName ?? '',
+        role: profile?.role ?? 'staff',
+        email: sessionUser.email ?? ''
+      });
     } catch (err) {
       console.error('Login error:', err);
       setError('System error. Please try again later.');
@@ -40,105 +56,136 @@ export function Login({ onLogin }: LoginProps) {
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                <Lock className="w-8 h-8 text-blue-600" />
-              </div>
-              <h2 className="text-slate-800 mb-2">Forgot Password</h2>
-              <p className="text-slate-600 text-sm">
-                Please contact your system administrator to reset your password.
-              </p>
-            </div>
+      <div className="relative min-h-screen overflow-hidden bg-slate-50">
+        <div className="pointer-events-none absolute -right-24 top-0 h-64 w-64 rounded-full bg-sky-200/50 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-emerald-200/50 blur-3xl" />
 
-            <button
-              onClick={() => setShowForgotPassword(false)}
-              className="w-full px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-            >
-              Back to Login
-            </button>
-          </div>
+        <div className="relative mx-auto flex min-h-screen w-full max-w-lg items-center px-4 py-12">
+          <Card className="w-full border-slate-200/70 shadow-xl">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg">
+                <Lock className="h-6 w-6" />
+              </div>
+              <CardTitle>Forgot Password</CardTitle>
+              <CardDescription>
+                Please contact your system administrator to reset your password.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => setShowForgotPassword(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Back to Login
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <LogIn className="w-10 h-10 text-white" />
+    <div className="relative min-h-screen overflow-hidden bg-slate-50">
+      <div className="pointer-events-none absolute -right-24 top-0 h-64 w-64 rounded-full bg-sky-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-72 w-72 rounded-full bg-emerald-200/50 blur-3xl" />
+
+      <div className="relative mx-auto grid min-h-screen w-full max-w-5xl items-center gap-10 px-4 py-12 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-6 text-slate-900">
+          <div className="inline-flex items-center gap-3 rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Secure access for staff and administrators
           </div>
-          <h1 className="text-slate-800 mb-2">ICAMS</h1>
-          <p className="text-slate-600">ICT Asset Management System for Pejabat Daerah Kampar</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-slate-800 mb-6 text-center">Login to Your Account</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="loginId" className="block text-sm text-slate-700 mb-2">
-                Login ID
-              </label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  id="loginId"
-                  type="text"
-                  value={loginId}
-                  onChange={(e) => setLoginId(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your login ID"
-                  required
-                />
-              </div>
+          <div className="space-y-3">
+            <img
+              src={icamsLogo.src ? icamsLogo.src : icamsLogo as unknown as string}
+              alt="ICAMS logo"
+              className="w-32"
+            />
+            <p className="max-w-md text-base text-slate-600">
+              ICT Asset Management System for Pejabat Daerah Kampar. Manage assets,
+              requests, and reports with a streamlined, modern workflow.
+            </p>
+          </div>
+          <div className="grid max-w-md grid-cols-2 gap-4 text-sm text-slate-600">
+            <div className="rounded-xl border border-slate-200/70 bg-white/70 p-4 shadow-sm">
+              Role-based access
             </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm text-slate-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
+            <div className="rounded-xl border border-slate-200/70 bg-white/70 p-4 shadow-sm">
+              Fast approvals
             </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/30"
-            >
-              Sign In
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setShowForgotPassword(true)}
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              Forgot Password?
-            </button>
+            <div className="rounded-xl border border-slate-200/70 bg-white/70 p-4 shadow-sm">
+              Real-time insights
+            </div>
+            <div className="rounded-xl border border-slate-200/70 bg-white/70 p-4 shadow-sm">
+              Asset tracking
+            </div>
           </div>
         </div>
+
+        <Card className="w-full border-slate-200/70 shadow-xl">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-2xl">Welcome back</CardTitle>
+            <CardDescription>Sign in to continue managing your assets.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-11 pl-10"
+                    placeholder="Enter your email"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 pl-10"
+                    placeholder="Enter your password"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="h-11 w-full">
+                Sign In
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <Button
+                type="button"
+                variant="link"
+                className="text-sm text-slate-600"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                Forgot Password?
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

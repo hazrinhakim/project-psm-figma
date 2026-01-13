@@ -3,24 +3,29 @@ import { MaintenanceRequest } from '../../App';
 
 type DbMaintenanceRequestRow = {
   id: string;
-  asset_id: string;
-  asset_name: string;
-  staff_id: string;
-  staff_name: string;
-  issue_description: string;
+  asset_id: string | null;
+  requested_by: string | null;
+  title: string;
+  description: string | null;
   status: string;
-  submitted_date: string;
-  completed_date: string | null;
-  created_at?: string;
-  updated_at?: string;
+  admin_remark: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  assets?: {
+    asset_no: string | null;
+    asset_name: string | null;
+  } | null;
+  profiles?: {
+    full_name: string | null;
+  } | null;
 };
 
 // Get all maintenance requests
 export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
   const { data, error } = await supabase
     .from<DbMaintenanceRequestRow>('maintenance_requests')
-    .select('*')
-    .order('submitted_date', { ascending: false });
+    .select('*, assets(asset_no, asset_name), profiles(full_name)')
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching maintenance requests:', error);
@@ -34,7 +39,7 @@ export async function getMaintenanceRequests(): Promise<MaintenanceRequest[]> {
 export async function getMaintenanceRequestById(id: string): Promise<MaintenanceRequest | null> {
   const { data, error } = await supabase
     .from<DbMaintenanceRequestRow>('maintenance_requests')
-    .select('*')
+    .select('*, assets(asset_no, asset_name), profiles(full_name)')
     .eq('id', id)
     .maybeSingle();
 
@@ -50,9 +55,9 @@ export async function getMaintenanceRequestById(id: string): Promise<Maintenance
 export async function getMaintenanceRequestsByStaffId(staffId: string): Promise<MaintenanceRequest[]> {
   const { data, error } = await supabase
     .from<DbMaintenanceRequestRow>('maintenance_requests')
-    .select('*')
-    .eq('staff_id', staffId)
-    .order('submitted_date', { ascending: false });
+    .select('*, assets(asset_no, asset_name), profiles(full_name)')
+    .eq('requested_by', staffId)
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching maintenance requests by staff ID:', error);
@@ -70,13 +75,11 @@ export async function createMaintenanceRequest(
     .from<DbMaintenanceRequestRow>('maintenance_requests')
     .insert({
       asset_id: request.assetId,
-      asset_name: request.assetName,
-      staff_id: request.staffId,
-      staff_name: request.staffName,
-      issue_description: request.issueDescription,
+      requested_by: request.requestedBy,
+      title: request.title,
+      description: request.description || null,
       status: request.status,
-      submitted_date: request.submittedDate,
-      completed_date: request.completedDate || null,
+      admin_remark: request.adminRemark || null,
     })
     .select()
     .single();
@@ -97,13 +100,12 @@ export async function updateMaintenanceRequest(
   const updateData: Partial<DbMaintenanceRequestRow> = {};
   
   if (updates.assetId !== undefined) updateData.asset_id = updates.assetId;
-  if (updates.assetName !== undefined) updateData.asset_name = updates.assetName;
-  if (updates.staffId !== undefined) updateData.staff_id = updates.staffId;
-  if (updates.staffName !== undefined) updateData.staff_name = updates.staffName;
-  if (updates.issueDescription !== undefined) updateData.issue_description = updates.issueDescription;
+  if (updates.requestedBy !== undefined) updateData.requested_by = updates.requestedBy;
+  if (updates.title !== undefined) updateData.title = updates.title;
+  if (updates.description !== undefined) updateData.description = updates.description || null;
   if (updates.status !== undefined) updateData.status = updates.status;
-  if (updates.submittedDate !== undefined) updateData.submitted_date = updates.submittedDate;
-  if (updates.completedDate !== undefined) updateData.completed_date = updates.completedDate || null;
+  if (updates.adminRemark !== undefined) updateData.admin_remark = updates.adminRemark || null;
+  if (updates.updatedAt !== undefined) updateData.updated_at = updates.updatedAt || null;
 
   const { data, error } = await supabase
     .from<DbMaintenanceRequestRow>('maintenance_requests')
@@ -137,14 +139,16 @@ export async function deleteMaintenanceRequest(id: string): Promise<void> {
 function mapRowToMaintenanceRequest(row: DbMaintenanceRequestRow): MaintenanceRequest {
   return {
     id: row.id,
-    assetId: row.asset_id,
-    assetName: row.asset_name,
-    staffId: row.staff_id,
-    staffName: row.staff_name,
-    issueDescription: row.issue_description,
-    status: row.status as 'pending' | 'in_progress' | 'completed',
-    submittedDate: row.submitted_date,
-    completedDate: row.completed_date || undefined,
+    assetId: row.asset_id ?? '',
+    assetLabel: row.assets?.asset_name || row.assets?.asset_no || '',
+    requestedBy: row.requested_by ?? '',
+    requestedByName: row.profiles?.full_name ?? '',
+    title: row.title,
+    description: row.description ?? '',
+    status: row.status as 'Pending' | 'In Progress' | 'Resolved',
+    adminRemark: row.admin_remark ?? '',
+    createdAt: row.created_at ?? '',
+    updatedAt: row.updated_at ?? '',
   };
 }
 

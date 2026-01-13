@@ -16,6 +16,9 @@ import {
 import { BarChart3, Download } from 'lucide-react';
 import { getAssets } from '../../lib/database/assets';
 import { getMaintenanceRequests } from '../../lib/database/maintenance';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 export function Reports() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -48,7 +51,7 @@ export function Reports() {
 
   // Asset Distribution by Category
   const categoryData = assets.reduce((acc: { name: string; count: number }[], asset) => {
-    const category = asset.category || 'Uncategorized';
+    const category = asset.categoryName || 'Uncategorized';
     const existing = acc.find((item) => item.name === category);
     if (existing) {
       existing.count += 1;
@@ -58,20 +61,20 @@ export function Reports() {
     return acc;
   }, []);
 
-  // Asset Status Distribution
+  // Maintenance Status Distribution
   const statusData = [
-    { name: 'Active', value: assets.filter((a) => a.status === 'active').length },
-    { name: 'Maintenance', value: assets.filter((a) => a.status === 'maintenance').length },
-    { name: 'Inactive', value: assets.filter((a) => a.status === 'inactive').length }
+    { name: 'Pending', value: maintenanceRequests.filter((r) => r.status === 'Pending').length },
+    { name: 'In Progress', value: maintenanceRequests.filter((r) => r.status === 'In Progress').length },
+    { name: 'Resolved', value: maintenanceRequests.filter((r) => r.status === 'Resolved').length }
   ];
 
   // Maintenance History by Month
   const maintenanceByMonth = maintenanceRequests.reduce(
     (acc: { month: string; pending: number; inProgress: number; completed: number }[], request) => {
       // Handle date parsing - could be string or Date object
-      const date = request.submittedDate instanceof Date 
-        ? request.submittedDate 
-        : new Date(request.submittedDate);
+      const date = request.createdAt instanceof Date
+        ? request.createdAt
+        : new Date(request.createdAt);
       
       // Skip invalid dates
       if (isNaN(date.getTime())) {
@@ -81,15 +84,15 @@ export function Reports() {
       const month = date.toLocaleString('default', { month: 'short', year: 'numeric' });
       const existing = acc.find((item) => item.month === month);
       if (existing) {
-        existing.pending += request.status === 'pending' ? 1 : 0;
-        existing.inProgress += request.status === 'in_progress' ? 1 : 0;
-        existing.completed += request.status === 'completed' ? 1 : 0;
+        existing.pending += request.status === 'Pending' ? 1 : 0;
+        existing.inProgress += request.status === 'In Progress' ? 1 : 0;
+        existing.completed += request.status === 'Resolved' ? 1 : 0;
       } else {
         acc.push({
           month,
-          pending: request.status === 'pending' ? 1 : 0,
-          inProgress: request.status === 'in_progress' ? 1 : 0,
-          completed: request.status === 'completed' ? 1 : 0
+          pending: request.status === 'Pending' ? 1 : 0,
+          inProgress: request.status === 'In Progress' ? 1 : 0,
+          completed: request.status === 'Resolved' ? 1 : 0
         });
       }
       return acc;
@@ -97,7 +100,7 @@ export function Reports() {
     []
   );
 
-  const COLORS = ['#10b981', '#f59e0b', '#64748b'];
+  const COLORS = ['#1e3a8a', '#475569', '#94a3b8'];
 
   const exportReport = () => {
     const reportData = {
@@ -107,9 +110,9 @@ export function Reports() {
       assetsByStatus: statusData,
       maintenanceRequests: {
         total: maintenanceRequests.length,
-        pending: maintenanceRequests.filter((r) => r.status === 'pending').length,
-        inProgress: maintenanceRequests.filter((r) => r.status === 'in_progress').length,
-        completed: maintenanceRequests.filter((r) => r.status === 'completed').length
+        pending: maintenanceRequests.filter((r) => r.status === 'Pending').length,
+        inProgress: maintenanceRequests.filter((r) => r.status === 'In Progress').length,
+        completed: maintenanceRequests.filter((r) => r.status === 'Resolved').length
       }
     };
 
@@ -131,66 +134,67 @@ export function Reports() {
           <p className="text-slate-600 text-sm mt-1">Visualize asset data and maintenance patterns</p>
         </div>
 
-        <button
-          onClick={exportReport}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
+        <Button onClick={exportReport} className="gap-2">
           <Download className="w-5 h-5" />
           Export Report
-        </button>
+        </Button>
       </div>
 
       {/* Report Type Selector */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        <button
+        <Button
+          variant={selectedReport === 'distribution' ? 'default' : 'outline'}
           onClick={() => setSelectedReport('distribution')}
-          className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-            selectedReport === 'distribution' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
         >
           Asset Distribution
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant={selectedReport === 'status' ? 'default' : 'outline'}
           onClick={() => setSelectedReport('status')}
-          className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-            selectedReport === 'status' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
         >
-          Asset Status
-        </button>
+          Maintenance Status
+        </Button>
 
-        <button
+        <Button
+          variant={selectedReport === 'maintenance' ? 'default' : 'outline'}
           onClick={() => setSelectedReport('maintenance')}
-          className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-            selectedReport === 'maintenance' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
         >
           Maintenance History
-        </button>
+        </Button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg p-4 border border-slate-200">
-          <div className="text-2xl text-slate-800">{assets.length}</div>
-          <div className="text-sm text-slate-600">Total Assets</div>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl text-slate-800 font-semibold tabular-nums">{assets.length}</div>
+            <div className="text-sm text-slate-600">Total Assets</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg p-4 border border-slate-200">
-          <div className="text-2xl text-blue-600">{categoryData.length}</div>
-          <div className="text-sm text-slate-600">Categories</div>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl text-slate-800 font-semibold tabular-nums">{categoryData.length}</div>
+            <div className="text-sm text-slate-600">Categories</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg p-4 border border-slate-200">
-          <div className="text-2xl text-orange-600">{maintenanceRequests.length}</div>
-          <div className="text-sm text-slate-600">Maintenance Requests</div>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl text-slate-800 font-semibold tabular-nums">{maintenanceRequests.length}</div>
+            <div className="text-sm text-slate-600">Maintenance Requests</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg p-4 border border-slate-200">
-          <div className="text-2xl text-green-600">{assets.filter((a) => a.status === 'active').length}</div>
-          <div className="text-sm text-slate-600">Active Assets</div>
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl text-slate-800 font-semibold tabular-nums">
+              {maintenanceRequests.filter((r) => r.status === 'Resolved').length}
+            </div>
+            <div className="text-sm text-slate-600">Resolved Requests</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Error / Loading */}
@@ -205,11 +209,12 @@ export function Reports() {
       ) : (
         <>
           {/* Charts */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <Card>
+            <CardContent>
             {selectedReport === 'distribution' && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                  <BarChart3 className="w-6 h-6 text-slate-700" />
                   <h3 className="text-slate-800">Asset Distribution by Category</h3>
                 </div>
 
@@ -227,7 +232,7 @@ export function Reports() {
                         }}
                       />
                       <Legend />
-                      <Bar dataKey="count" fill="#3b82f6" name="Number of Assets" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="count" fill="#1e3a8a" name="Number of Assets" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -239,8 +244,8 @@ export function Reports() {
             {selectedReport === 'status' && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
-                  <h3 className="text-slate-800">Asset Status Distribution</h3>
+                  <BarChart3 className="w-6 h-6 text-slate-700" />
+                <h3 className="text-slate-800">Maintenance Status Distribution</h3>
                 </div>
 
                 {statusData.some((d) => d.value > 0) ? (
@@ -285,7 +290,7 @@ export function Reports() {
             {selectedReport === 'maintenance' && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                  <BarChart3 className="w-6 h-6 text-slate-700" />
                   <h3 className="text-slate-800">Maintenance Request History</h3>
                 </div>
 
@@ -303,9 +308,9 @@ export function Reports() {
                         }}
                       />
                       <Legend />
-                      <Bar dataKey="pending" fill="#f59e0b" name="Pending" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="inProgress" fill="#3b82f6" name="In Progress" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="completed" fill="#10b981" name="Completed" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="pending" fill="#94a3b8" name="Pending" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="inProgress" fill="#1e3a8a" name="In Progress" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="completed" fill="#475569" name="Resolved" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -313,48 +318,41 @@ export function Reports() {
                 )}
               </div>
             )}
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Table View */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-            <h3 className="text-slate-800 mb-4">Recent Assets</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs text-slate-600 uppercase">Asset ID</th>
-                    <th className="px-4 py-3 text-left text-xs text-slate-600 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs text-slate-600 uppercase">Category</th>
-                    <th className="px-4 py-3 text-left text-xs text-slate-600 uppercase">Location</th>
-                    <th className="px-4 py-3 text-left text-xs text-slate-600 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {assets.slice(0, 10).map((asset) => (
-                    <tr key={asset.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-sm text-slate-800">{asset.assetId}</td>
-                      <td className="px-4 py-3 text-sm text-slate-800">{asset.name}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{asset.category}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{asset.location}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                            asset.status === 'active'
-                              ? 'bg-green-100 text-green-700'
-                              : asset.status === 'maintenance'
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {asset.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent Assets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-muted">
+                    <TableRow>
+                      <TableHead className="text-xs uppercase text-muted-foreground">Asset No</TableHead>
+                      <TableHead className="text-xs uppercase text-muted-foreground">Name</TableHead>
+                      <TableHead className="text-xs uppercase text-muted-foreground">Category</TableHead>
+                      <TableHead className="text-xs uppercase text-muted-foreground">Department</TableHead>
+                      <TableHead className="text-xs uppercase text-muted-foreground">Unit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {assets.slice(0, 10).map((asset) => (
+                      <TableRow key={asset.id}>
+                        <TableCell className="text-sm text-slate-800">{asset.assetNo}</TableCell>
+                        <TableCell className="text-sm text-slate-800">{asset.assetName}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{asset.categoryName}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{asset.department}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{asset.unit}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

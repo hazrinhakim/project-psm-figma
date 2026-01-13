@@ -7,7 +7,14 @@ import {
   getMaintenanceRequestsByStaffId
 } from '../../lib/database/maintenance';
 import { createNotification } from '../../lib/database/notifications';
-import { getUsers } from '../../lib/database/users';
+import { getProfilesByRoles } from '../../lib/database/profiles';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Textarea } from '../ui/textarea';
 
 interface MaintenanceRequestProps {
   user: User;
@@ -16,6 +23,7 @@ interface MaintenanceRequestProps {
 export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [title, setTitle] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
   const [success, setSuccess] = useState(false);
   const [myRequests, setMyRequests] = useState<MaintenanceRequestType[]>([]);
@@ -23,6 +31,13 @@ export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const matchesAssignedUser = (assetUserName: string, staffName: string) => {
+    const assetName = assetUserName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const userName = staffName.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!assetName || !userName) return false;
+    return assetName.includes(userName) || userName.includes(assetName);
+  };
 
   useEffect(() => {
     loadAssets();
@@ -35,7 +50,10 @@ export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
     setError(null);
     try {
       const data = await getAssets();
-      setAssets(data ?? []);
+      const assignedAssets = (data ?? []).filter((asset) =>
+        matchesAssignedUser(asset.userName, user.fullName)
+      );
+      setAssets(assignedAssets);
     } catch (err) {
       console.error('Failed to load assets:', err);
       setError('Gagal memuatkan aset. Sila cuba lagi.');
@@ -72,31 +90,31 @@ export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
 
     const newRequestPayload: Omit<MaintenanceRequestType, 'id'> = {
       assetId: asset.id,
-      assetName: asset.name,
-      staffId: user.id,
-      staffName: user.name,
-      issueDescription,
-      status: 'pending',
-      submittedDate: new Date().toISOString()
+      assetLabel: asset.assetName || asset.assetNo || '',
+      requestedBy: user.id,
+      requestedByName: user.fullName,
+      title,
+      description: issueDescription,
+      status: 'Pending',
+      adminRemark: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     try {
       // Create maintenance request in DB
-      const created = await createMaintenanceRequest(newRequestPayload);
+      await createMaintenanceRequest(newRequestPayload);
 
       // Notify admin users
       try {
-        const users = await getUsers();
-        const adminUsers = (users || []).filter(
-          (u) => u.role === 'admin' || u.role === 'admin_assistant'
-        );
+        const adminUsers = await getProfilesByRoles(['admin', 'admin_assistant']);
 
         // Create notifications for each admin
         await Promise.all(
           adminUsers.map((admin) =>
             createNotification({
               userId: admin.id,
-              message: `New maintenance request from ${user.name} for ${asset.name}`,
+              message: `New maintenance request from ${user.fullName} for ${asset.assetName || asset.assetNo}`,
               type: 'maintenance',
               date: new Date().toISOString(),
               read: false
@@ -110,6 +128,7 @@ export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
 
       setSuccess(true);
       setSelectedAssetId('');
+      setTitle('');
       setIssueDescription('');
       // Refresh user's requests
       await loadMyRequests();
@@ -131,109 +150,120 @@ export function MaintenanceRequest({ user }: MaintenanceRequestProps) {
       </div>
 
       {/* Request Form */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-            <Wrench className="w-6 h-6 text-orange-600" />
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+            <Wrench className="w-6 h-6 text-slate-700" />
           </div>
-          <h3 className="text-slate-800">New Maintenance Request</h3>
-        </div>
+          <CardTitle className="text-base">New Maintenance Request</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Asset</Label>
+              <Select value={selectedAssetId} onValueChange={setSelectedAssetId} disabled={loadingAssets}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingAssets ? 'Loading assets...' : 'Choose an asset...'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {assets.map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.assetNo} - {asset.assetName || asset.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">Select Asset</label>
-            <select
-              value={selectedAssetId}
-              onChange={(e) => setSelectedAssetId(e.target.value)}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              required
-              disabled={loadingAssets}
-            >
-              <option value="">{loadingAssets ? 'Loading assets...' : 'Choose an asset...'}</option>
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.assetId} - {asset.name} ({asset.location})
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Printer not turning on"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">Issue Description</label>
-            <textarea
-              value={issueDescription}
-              onChange={(e) => setIssueDescription(e.target.value)}
-              placeholder="Describe the issue or problem with the asset..."
-              rows={5}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Issue Description</Label>
+              <Textarea
+                value={issueDescription}
+                onChange={(e) => setIssueDescription(e.target.value)}
+                placeholder="Describe the issue or problem with the asset..."
+                rows={5}
+                required
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
-          >
-            <Send className="w-5 h-5" />
-            {saving ? 'Submitting...' : 'Submit Request'}
-          </button>
-        </form>
+            <Button type="submit" disabled={saving} className="w-full gap-2">
+              <Send className="w-5 h-5" />
+              {saving ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </form>
 
-        {success && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-            ✓ Maintenance request submitted successfully!
-          </div>
-        )}
-      </div>
+          {success && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg">
+              Maintenance request submitted successfully!
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* My Requests */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-        <h3 className="text-slate-800 mb-4">My Requests</h3>
-
-        {loadingRequests ? (
-          <div className="p-4 text-sm text-slate-500">Loading your requests...</div>
-        ) : myRequests.length === 0 ? (
-          <p className="text-slate-500 text-sm py-4">No requests submitted yet</p>
-        ) : (
-          <div className="space-y-3">
-            {myRequests.map((request) => (
-              <div
-                key={request.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
-              >
-                <div className="flex-1">
-                  <p className="text-sm text-slate-800">{request.assetName}</p>
-                  <p className="text-xs text-slate-600 mt-1">{request.issueDescription}</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {new Date(request.submittedDate).toLocaleDateString()}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs px-3 py-1 rounded-full whitespace-nowrap ml-4 ${
-                    request.status === 'pending'
-                      ? 'bg-orange-100 text-orange-700'
-                      : request.status === 'in_progress'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-green-100 text-green-700'
-                  }`}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">My Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingRequests ? (
+            <div className="p-4 text-sm text-slate-500">Loading your requests...</div>
+          ) : myRequests.length === 0 ? (
+            <p className="text-slate-500 text-sm py-4">No requests submitted yet</p>
+          ) : (
+            <div className="space-y-3">
+              {myRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
                 >
-                  {request.status.replace('_', ' ')}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-800">{request.assetLabel}</p>
+                    <p className="text-xs text-slate-600 mt-1">{request.title}</p>
+                    {request.description && (
+                      <p className="text-xs text-slate-500 mt-1">{request.description}</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {new Date(request.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      request.status === 'Pending'
+                        ? 'bg-slate-100 text-slate-700'
+                        : request.status === 'In Progress'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-slate-100 text-slate-700'
+                    }
+                  >
+                    {request.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Instructions */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
         <h3 className="text-slate-800 mb-3">How to Submit a Request</h3>
         <ol className="space-y-2 text-sm text-slate-700">
           <li>1. Select the asset that needs maintenance from the dropdown</li>

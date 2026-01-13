@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Asset } from '../../App';
-import { Package, Search, MapPin, Calendar } from 'lucide-react';
+import { Asset, User } from '../../App';
+import { Package, Search } from 'lucide-react';
 import { getAssets } from '../../lib/database/assets';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
-export function AssetView() {
+interface AssetViewProps {
+  user: User;
+}
+
+export function AssetView({ user }: AssetViewProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -29,19 +36,89 @@ export function AssetView() {
     }
   };
 
-  const categories = ['all', ...Array.from(new Set(assets.map((a) => a.category || 'Uncategorized')))];
+  const categories = [
+    'all',
+    ...Array.from(new Set(assets.map((a) => a.categoryName || 'Uncategorized')))
+  ];
 
-  const filteredAssets = assets.filter((asset) => {
+  const matchesAssignedUser = (assetUserName: string, staffName: string) => {
+    const assetName = assetUserName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const userName = staffName.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!assetName || !userName) return false;
+    return assetName.includes(userName) || userName.includes(assetName);
+  };
+
+  const assignedAssets = assets.filter((asset) =>
+    matchesAssignedUser(asset.userName, user.fullName)
+  );
+
+  const filteredAssets = assignedAssets.filter((asset) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
-      asset.name.toLowerCase().includes(q) ||
-      asset.assetId.toLowerCase().includes(q) ||
-      asset.location.toLowerCase().includes(q);
+      !q ||
+      [
+        asset.assetNo,
+        asset.assetName,
+        asset.categoryName,
+        asset.department,
+        asset.unit,
+        asset.userName,
+        asset.model,
+        asset.serialNo
+      ]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(q));
 
-    const matchesCategory = selectedCategory === 'all' || (asset.category || 'Uncategorized') === selectedCategory;
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      (asset.categoryName || 'Uncategorized') === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
+
+  const formatValue = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === '') return '-';
+    return String(value);
+  };
+
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString();
+  };
+
+  const getAssetDetails = (asset: Asset) => [
+    { label: 'Asset No', value: asset.assetNo },
+    { label: 'Asset Name', value: asset.assetName },
+    { label: 'Category', value: asset.categoryName },
+    { label: 'Type', value: asset.type },
+    { label: 'Year', value: asset.year },
+    { label: 'Department', value: asset.department },
+    { label: 'Unit', value: asset.unit },
+    { label: 'User Name', value: asset.userName },
+    { label: 'Purchase Date', value: formatDate(asset.purchaseDate) },
+    { label: 'Price', value: asset.price ?? null },
+    { label: 'Supplier', value: asset.supplier },
+    { label: 'Source', value: asset.source },
+    { label: 'Model', value: asset.model },
+    { label: 'Serial No', value: asset.serialNo },
+    { label: 'Processor', value: asset.processor },
+    { label: 'RAM Capacity', value: asset.ramCapacity },
+    { label: 'HDD Capacity', value: asset.hddCapacity },
+    { label: 'Monitor Model', value: asset.monitorModel },
+    { label: 'Monitor Serial No', value: asset.monitorSerialNo },
+    { label: 'Monitor Asset No', value: asset.monitorAssetNo },
+    { label: 'Keyboard Model', value: asset.keyboardModel },
+    { label: 'Keyboard Serial No', value: asset.keyboardSerialNo },
+    { label: 'Keyboard Asset No', value: asset.keyboardAssetNo },
+    { label: 'Mouse Model', value: asset.mouseModel },
+    { label: 'Mouse Serial No', value: asset.mouseSerialNo },
+    { label: 'Mouse Asset No', value: asset.mouseAssetNo },
+    { label: 'Accessories', value: asset.accessories },
+    { label: 'QR Code', value: asset.qrCode ?? '' },
+    { label: 'Created At', value: formatDate(asset.createdAt ?? '') }
+  ];
 
   return (
     <div className="space-y-6">
@@ -55,25 +132,26 @@ export function AssetView() {
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
+          <Input
             type="text"
             placeholder="Search assets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="pl-11"
           />
         </div>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="px-4 py-3 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-        >
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category === 'all' ? 'All Categories' : category}
-            </option>
-          ))}
-        </select>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-full md:w-64">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category === 'all' ? 'All Categories' : category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Error / Loading */}
@@ -90,55 +168,30 @@ export function AssetView() {
           {/* Assets Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAssets.map((asset) => (
-              <div key={asset.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-4">
+              <Card key={asset.id}>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Package className="w-6 h-6 text-green-600" />
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                      <Package className="w-6 h-6 text-slate-700" />
                     </div>
                     <div>
-                      <h3 className="text-slate-800">{asset.assetId}</h3>
-                      <p className="text-sm text-slate-600">{asset.category}</p>
+                      <CardTitle className="text-base">{asset.assetNo || '-'}</CardTitle>
+                      <p className="text-sm text-slate-600">{asset.categoryName || 'Uncategorized'}</p>
                     </div>
                   </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      asset.status === 'active'
-                        ? 'bg-green-100 text-green-700'
-                        : asset.status === 'maintenance'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {asset.status}
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-800">{asset.name}</p>
-
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <MapPin className="w-4 h-4" />
-                    <span>{asset.location}</span>
+                  <p className="text-xs text-slate-500">{asset.type || '—'}</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2 text-xs text-slate-700">
+                    {getAssetDetails(asset).map((item) => (
+                      <div key={item.label} className="flex items-start justify-between gap-4">
+                        <span className="text-slate-500">{item.label}</span>
+                        <span className="text-right text-slate-800">{formatValue(item.value)}</span>
+                      </div>
+                    ))}
                   </div>
-
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      Purchased:{' '}
-                      {asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : '—'}
-                    </span>
-                  </div>
-
-                  {asset.warrantyExpiry && (
-                    <div className="pt-3 border-t border-slate-200">
-                      <p className="text-xs text-slate-600">
-                        Warranty until: {new Date(asset.warrantyExpiry).toLocaleDateString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
 

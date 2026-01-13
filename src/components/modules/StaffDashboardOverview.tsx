@@ -3,6 +3,8 @@ import { MaintenanceRequest, Asset } from '../../App';
 import { Package, Wrench, Clock, CheckCircle } from 'lucide-react';
 import { getAssets } from '../../lib/database/assets';
 import { getMaintenanceRequestsByStaffId } from '../../lib/database/maintenance';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 interface StaffDashboardOverviewProps {
   userId: string;
@@ -42,42 +44,42 @@ export function StaffDashboardOverview({ userId }: StaffDashboardOverviewProps) 
     }
   };
 
-  const pendingRequests = myRequests.filter((r) => r.status === 'pending').length;
-  const inProgressRequests = myRequests.filter((r) => r.status === 'in_progress').length;
-  const completedRequests = myRequests.filter((r) => r.status === 'completed').length;
+  const pendingRequests = myRequests.filter((r) => r.status === 'Pending').length;
+  const inProgressRequests = myRequests.filter((r) => r.status === 'In Progress').length;
+  const completedRequests = myRequests.filter((r) => r.status === 'Resolved').length;
 
   const stats = [
     {
       label: 'Total Assets',
       value: assets.length,
       icon: Package,
-      color: 'bg-blue-500',
-      lightColor: 'bg-blue-50',
-      textColor: 'text-blue-600'
+      color: 'bg-slate-700',
+      lightColor: 'bg-slate-100',
+      textColor: 'text-slate-700'
     },
     {
       label: 'Pending Requests',
       value: pendingRequests,
       icon: Clock,
-      color: 'bg-orange-500',
-      lightColor: 'bg-orange-50',
-      textColor: 'text-orange-600'
+      color: 'bg-slate-700',
+      lightColor: 'bg-slate-100',
+      textColor: 'text-slate-700'
     },
     {
       label: 'In Progress',
       value: inProgressRequests,
       icon: Wrench,
-      color: 'bg-blue-500',
-      lightColor: 'bg-blue-50',
-      textColor: 'text-blue-600'
+      color: 'bg-slate-700',
+      lightColor: 'bg-slate-100',
+      textColor: 'text-slate-700'
     },
     {
-      label: 'Completed',
+      label: 'Resolved',
       value: completedRequests,
       icon: CheckCircle,
-      color: 'bg-green-500',
-      lightColor: 'bg-green-50',
-      textColor: 'text-green-600'
+      color: 'bg-slate-700',
+      lightColor: 'bg-slate-100',
+      textColor: 'text-slate-700'
     }
   ];
 
@@ -100,71 +102,75 @@ export function StaffDashboardOverview({ userId }: StaffDashboardOverviewProps) 
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between mb-4">
+            <Card key={index}>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <div className={`${stat.lightColor} p-3 rounded-lg`}>
                   <Icon className={`w-6 h-6 ${stat.textColor}`} />
                 </div>
-              </div>
-              <div className="text-3xl text-slate-800 mb-1">{stat.value}</div>
-              <div className="text-sm text-slate-600">{stat.label}</div>
-            </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl text-slate-800 mb-1">{stat.value}</div>
+                <div className="text-sm text-slate-600">{stat.label}</div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
 
       {/* Recent Requests */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-        <div className="flex items-center gap-3 mb-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
           <Wrench className="w-5 h-5 text-slate-600" />
-          <h3 className="text-slate-800">My Recent Requests</h3>
-        </div>
-
-        {loadingRequests ? (
-          <div className="p-4 text-sm text-slate-500">Loading your requests...</div>
-        ) : (
-          <div className="space-y-3">
-            {myRequests.slice(0, 5).length === 0 ? (
-              <p className="text-slate-500 text-sm py-4">No maintenance requests yet</p>
-            ) : (
-              myRequests.slice(0, 5).map((request) => (
-                <div
-                  key={request.id}
-                  className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-800 truncate">{request.assetName}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {new Date(request.submittedDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      request.status === 'pending'
-                        ? 'bg-orange-100 text-orange-700'
-                        : request.status === 'in_progress'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}
+          <CardTitle className="text-base">My Recent Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingRequests ? (
+            <div className="p-4 text-sm text-slate-500">Loading your requests...</div>
+          ) : (
+            <div className="space-y-3">
+              {myRequests.slice(0, 5).length === 0 ? (
+                <p className="text-slate-500 text-sm py-4">No maintenance requests yet</p>
+              ) : (
+                myRequests.slice(0, 5).map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
                   >
-                    {request.status.replace('_', ' ')}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-800 truncate">{request.assetLabel}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {new Date(request.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="text-xs">
+                      <Badge
+                        variant="secondary"
+                        className={
+                          request.status === 'In Progress'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-slate-100 text-slate-700'
+                        }
+                      >
+                        {request.status}
+                      </Badge>
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
 
       {/* Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
         <h3 className="text-slate-800 mb-3">Tips for Using ICAMS</h3>
         <ul className="space-y-2 text-sm text-slate-700">
-          <li>• Use the QR Scanner to quickly find asset information</li>
-          <li>• Submit maintenance requests as soon as you notice issues</li>
-          <li>• Check your notifications for updates on your requests</li>
-          <li>• Share feedback to help improve the system</li>
+          <li>Use the QR Scanner to confirm asset information</li>
+          <li>Submit maintenance requests as soon as you notice issues</li>
+          <li>Check your notifications for updates on your requests</li>
+          <li>Share feedback to help improve the system</li>
         </ul>
       </div>
     </div>

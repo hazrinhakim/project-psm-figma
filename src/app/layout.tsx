@@ -1,4 +1,4 @@
-import '../index.css';
+import '../styles/globals.css';
 
 export const metadata = {
   title: 'Website Design for ICAMS',

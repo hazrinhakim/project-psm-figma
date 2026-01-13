@@ -6,6 +6,9 @@ import {
   getMaintenanceRequests
 } from '../../lib/database/maintenance';
 import { getFeedback } from '../../lib/database/feedback';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 interface DashboardOverviewProps {
   role: 'admin' | 'admin_assistant';
@@ -45,52 +48,51 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
     }
   };
 
-  const pendingMaintenance = maintenanceRequests.filter((m) => m.status === 'pending').length;
-  const inProgressMaintenance = maintenanceRequests.filter((m) => m.status === 'in_progress').length;
-  const activeAssets = assets.filter((a) => a.status === 'active').length;
-  const inProgressAssetIds = new Set(
-    maintenanceRequests.filter((m) => m.status === 'in_progress').map((m) => m.assetId)
+  const pendingMaintenance = maintenanceRequests.filter((m) => m.status === 'Pending').length;
+  const inProgressMaintenance = maintenanceRequests.filter((m) => m.status === 'In Progress').length;
+  const resolvedMaintenance = maintenanceRequests.filter((m) => m.status === 'Resolved').length;
+  const openFeedback = feedback.filter((f) => f.status === 'open').length;
+  const activeAssets = assets.filter((asset) => asset.userName.trim().length > 0).length;
+  const maintenanceAssetIds = new Set(
+    maintenanceRequests
+      .filter((request) => request.status !== 'Resolved')
+      .map((request) => request.assetId)
   );
-  const maintenanceAssets = assets.filter(
-    (asset) =>
-      asset.status === 'maintenance' ||
-      inProgressAssetIds.has(asset.id) ||
-      inProgressAssetIds.has(asset.assetId)
-  ).length;
-  const unreadFeedback = feedback.filter((f) => f.status === 'new').length;
+  const underMaintenanceAssets = maintenanceAssetIds.size;
+  const inactiveAssets = Math.max(assets.length - activeAssets, 0);
 
   const stats = [
     {
       label: 'Total Assets',
       value: assets.length,
       icon: Package,
-      color: 'bg-blue-500',
-      lightColor: 'bg-blue-50',
-      textColor: 'text-blue-600'
+      lightColor: 'bg-sky-100',
+      textColor: 'text-sky-700',
+      description: 'All registered items'
     },
     {
       label: 'Active Assets',
       value: activeAssets,
       icon: TrendingUp,
-      color: 'bg-green-500',
-      lightColor: 'bg-green-50',
-      textColor: 'text-green-600'
+      lightColor: 'bg-emerald-100',
+      textColor: 'text-emerald-700',
+      description: 'Assigned to staff'
     },
     {
       label: 'Pending Maintenance',
       value: pendingMaintenance,
       icon: AlertCircle,
-      color: 'bg-orange-500',
-      lightColor: 'bg-orange-50',
-      textColor: 'text-orange-600'
+      lightColor: 'bg-amber-100',
+      textColor: 'text-amber-700',
+      description: 'Awaiting action'
     },
     {
       label: 'New Feedback',
-      value: unreadFeedback,
+      value: openFeedback,
       icon: MessageSquare,
-      color: 'bg-purple-500',
-      lightColor: 'bg-purple-50',
-      textColor: 'text-purple-600'
+      lightColor: 'bg-blue-100',
+      textColor: 'text-blue-700',
+      description: 'Latest staff input'
     }
   ];
 
@@ -117,15 +119,18 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
             {stats.map((stat, index) => {
               const Icon = stat.icon;
               return (
-                <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className={`${stat.lightColor} p-3 rounded-lg`}>
+                <Card key={index} className="bg-white border-slate-200/80 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div className={`${stat.lightColor} p-3 rounded-2xl`}>
                       <Icon className={`w-6 h-6 ${stat.textColor}`} />
                     </div>
-                  </div>
-                  <div className="text-3xl text-slate-800 mb-1">{stat.value}</div>
-                  <div className="text-sm text-slate-600">{stat.label}</div>
-                </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl text-slate-900 mb-1">{stat.value}</div>
+                    <div className="text-sm text-slate-700">{stat.label}</div>
+                    <div className="text-xs text-slate-500 mt-1">{stat.description}</div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -133,17 +138,20 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
           {/* Recent Activity */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Recent Maintenance Requests */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-3">
                 <Wrench className="w-5 h-5 text-slate-600" />
-                <h3 className="text-slate-800">Recent Maintenance Requests</h3>
-                <button
+                <CardTitle className="text-base">Recent Maintenance Requests</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto text-xs text-sky-600 hover:text-sky-700"
                   onClick={loadData}
-                  className="ml-auto text-xs text-slate-500 hover:underline"
                 >
                   Refresh
-                </button>
-              </div>
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
               <div className="space-y-3">
                 {maintenanceRequests.slice(0, 5).length === 0 ? (
                   <p className="text-slate-500 text-sm">No maintenance requests yet</p>
@@ -154,33 +162,42 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
                       className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-800 truncate">{request.assetName}</p>
-                        <p className="text-xs text-slate-500 mt-1">By {request.staffName}</p>
+                        <p className="text-sm text-slate-800 truncate">{request.assetLabel}</p>
+                        <p className="text-xs text-slate-500 mt-1">By {request.requestedByName}</p>
                       </div>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          request.status === 'pending'
-                            ? 'bg-orange-100 text-orange-700'
-                            : request.status === 'in_progress'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
-                        }`}
+                        className="text-xs"
                       >
-                        {request.status.replace('_', ' ')}
+                        <Badge
+                          variant="secondary"
+                          className={
+                            request.status === 'In Progress'
+                              ? 'bg-blue-100 text-blue-700'
+                              : request.status === 'Pending'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-slate-100 text-slate-700'
+                          }
+                        >
+                          {request.status}
+                        </Badge>
                       </span>
                     </div>
                   ))
                 )}
               </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Asset Status Overview */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center gap-3 mb-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-3">
                 <Package className="w-5 h-5 text-slate-600" />
-                <h3 className="text-slate-800">Asset Status Overview</h3>
-              </div>
-              <div className="space-y-4">
+                <div>
+                  <CardTitle className="text-base">Asset Status Overview</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">Current asset activity snapshot</p>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-600">Active</span>
@@ -188,9 +205,11 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div
-                      className="bg-green-500 h-2 rounded-full"
+                      className="bg-emerald-600 h-2 rounded-full"
                       style={{
-                        width: `${assets.length > 0 ? (activeAssets / assets.length) * 100 : 0}%`
+                        width: `${
+                          assets.length > 0 ? (activeAssets / assets.length) * 100 : 0
+                        }%`
                       }}
                     />
                   </div>
@@ -199,13 +218,15 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-600">Under Maintenance</span>
-                    <span className="text-sm text-slate-800">{maintenanceAssets} assets</span>
+                    <span className="text-sm text-slate-800">{underMaintenanceAssets} assets</span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div
-                      className="bg-orange-500 h-2 rounded-full"
+                      className="bg-amber-500 h-2 rounded-full"
                       style={{
-                        width: `${assets.length > 0 ? (maintenanceAssets / assets.length) * 100 : 0}%`
+                        width: `${
+                          assets.length > 0 ? (underMaintenanceAssets / assets.length) * 100 : 0
+                        }%`
                       }}
                     />
                   </div>
@@ -214,29 +235,22 @@ export function DashboardOverview({ role }: DashboardOverviewProps) {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-slate-600">Inactive</span>
-                    <span className="text-sm text-slate-800">
-                      {assets.filter((a) => a.status === 'inactive').length} assets
-                    </span>
+                    <span className="text-sm text-slate-800">{inactiveAssets} assets</span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-2">
                     <div
                       className="bg-slate-400 h-2 rounded-full"
                       style={{
                         width: `${
-                          assets.length > 0
-                            ? (assets.filter((a) => a.status === 'inactive').length / assets.length) *
-                              100
-                            : 0
+                          assets.length > 0 ? (inactiveAssets / assets.length) * 100 : 0
                         }%`
                       }}
                     />
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-
-
         </>
       )}
     </div>
